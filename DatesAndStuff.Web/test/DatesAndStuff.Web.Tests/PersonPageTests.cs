@@ -1,12 +1,13 @@
-using System;
-using System.Diagnostics;
-using System.Reflection;
-using System.Text;
 using FluentAssertions;
+using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
+using System;
+using System.Diagnostics;
+using System.Reflection;
+using System.Text;
 
 namespace DatesAndStuff.Web.Tests;
 
@@ -104,11 +105,10 @@ public class PersonPageTests
     {
         // Arrange
         driver.Navigate().GoToUrl(BaseURL);
-        driver.FindElement(By.XPath("//*[@data-test='PersonPageNavigation']")).Click();
-        var salaryBefore = driver.FindElement(By.XPath("//*[@data-test='DisplayedSalary']")).Text;
-        var salaryBeforeValue = double.Parse(salaryBefore);
-
         var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+        driver.FindElement(By.XPath("//*[@data-test='PersonPageNavigation']")).Click();
+        var salaryLabelBefore = wait.Until(ExpectedConditions.ElementIsVisible(By.XPath("//*[@data-test='DisplayedSalary']")));
+        var salaryBeforeValue = double.Parse(salaryLabelBefore.Text);
 
         var input = wait.Until(ExpectedConditions.ElementExists(By.XPath("//*[@data-test='SalaryIncreasePercentageInput']")));
         input.Clear();
@@ -126,6 +126,33 @@ public class PersonPageTests
         var expectedSalary = salaryBeforeValue * (1 + percentage / 100);
         salaryAfterSubmission.Should().BeApproximately(expectedSalary, 0.001);
     }
+
+    [Test]
+    [TestCase(-12)]
+    [TestCase(-15)]
+    [TestCase(-10)]
+    public void Person_SalaryIncrease_ShouldFail(double percentage)
+    {
+        //Arrange
+        driver.Navigate().GoToUrl(BaseURL);
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+        wait.Until(ExpectedConditions.ElementToBeClickable(By.XPath("//*[@data-test='PersonPageNavigation']"))).Click();
+        var input = wait.Until(ExpectedConditions.ElementExists(By.XPath("//*[@data-test='SalaryIncreasePercentageInput']")));
+        input.Click();
+        input.Clear();
+        input.SendKeys(percentage.ToString());
+
+        //Act
+        wait.Until(ExpectedConditions.ElementToBeClickable(By.XPath("//*[@data-test='SalaryIncreaseSubmitButton']"))).Click();
+
+        //Assert
+
+        var errorLabel = wait.Until(ExpectedConditions.ElementExists(By.XPath("//*[@data-test='SalaryErrorMessage']")));
+        errorLabel.Should().NotBeNull();
+        var inputError = wait.Until(ExpectedConditions.ElementExists(By.XPath("//*[@data-test='PercentageInputErrorMessage']")));
+        inputError.Should().NotBeNull();
+    }
+
     private bool IsElementPresent(By by)
     {
         try
