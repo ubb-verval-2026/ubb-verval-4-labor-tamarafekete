@@ -16,12 +16,17 @@ public class BlazeDemoTests
     private IWebDriver driver;
     private StringBuilder verificationErrors;
     private const string BaseURL = "https://blazedemo.com";
-
+    private const double PriceLimit = 300.0;
+    private readonly string ScreenshotFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "BlazeDemoScreenshots");
     [SetUp]
     public void SetupTest()
     {
         driver = new ChromeDriver();
         verificationErrors = new StringBuilder();
+        if (!Directory.Exists(ScreenshotFolder))
+        {
+            Directory.CreateDirectory(ScreenshotFolder);
+        }
     }
 
     [TearDown]
@@ -53,5 +58,41 @@ public class BlazeDemoTests
         wait.Until(ExpectedConditions.ElementIsVisible(By.ClassName("table")));
         var flightRows = driver.FindElements(By.XPath("//table[@class='table']/tbody/tr"));
         flightRows.Count.Should().BeGreaterThanOrEqualTo(3);
+
+        bool foundFlight = false;
+        foreach (var row in flightRows)
+        {
+            var priceText = row.FindElement(By.XPath("./td[6]")).Text;
+            var cleanPriceText = priceText.Replace("$", "").Trim();
+            if (double.TryParse(cleanPriceText, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double actualPrice))
+            {
+                if (actualPrice < PriceLimit)
+                {
+                    foundFlight = true;
+                    break;
+                }
+            }
+            
+        }
+        if (foundFlight)
+        {
+            TakeScreenshot("CheapFlightFound");
+        }
+    }
+
+    private void TakeScreenshot(string fileName)
+    {
+        try
+        {
+            ITakesScreenshot? ssdriver = driver as ITakesScreenshot;
+            Screenshot screenshot = ssdriver.GetScreenshot();
+
+            string filePath = Path.Combine(ScreenshotFolder, $"{fileName}_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+            screenshot.SaveAsFile(filePath);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
     }
 }
